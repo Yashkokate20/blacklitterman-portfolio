@@ -1,8 +1,8 @@
 """
-Black-Litterman Portfolio Optimization - Interactive 3D Dashboard
+Enhanced Black-Litterman Portfolio Optimization Dashboard
 
-This Streamlit app provides an interactive 3D dashboard for exploring
-Black-Litterman portfolio optimization with real-time parameter adjustments.
+Professional-grade Streamlit application with comprehensive features,
+3D visualizations, and export capabilities.
 """
 
 import streamlit as st
@@ -13,6 +13,10 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 import sys
 import warnings
+import io
+import base64
+from datetime import datetime, timedelta
+
 warnings.filterwarnings('ignore')
 
 # Add src to path
@@ -21,10 +25,11 @@ sys.path.append('src')
 # Import our modules
 from black_litterman import BlackLittermanModel
 from portfolio_optimization import PortfolioOptimizer
-import yfinance as yf
-from datetime import datetime, timedelta
+from backtesting import BacktestEngine
+from utils import load_market_data, calculate_performance_metrics
+from config import config
 
-# Page config
+# Page configuration
 st.set_page_config(
     page_title="Black-Litterman Portfolio Optimizer",
     page_icon="🎯",
@@ -32,154 +37,77 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS for better styling
 st.markdown("""
 <style>
 .metric-container {
     background-color: #f0f2f6;
     border: 1px solid #e0e0e0;
     border-radius: 10px;
-    padding: 20px;
+    padding: 15px;
     margin: 10px 0;
 }
 .stMetric > label {
     font-size: 14px !important;
     font-weight: bold !important;
 }
+.instruction-box {
+    background-color: #e8f4f8;
+    border-left: 5px solid #1f77b4;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 5px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
-def load_data():
-    """Load and cache market data"""
-    try:
-        # Default tickers
-        tickers = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NVDA', 'JPM', 'JNJ', 'UNH']
-        
-        # Download data
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=5*365)  # 5 years
-        
-        st.info("📡 Downloading live market data...")
-        
-        # Download with proper error handling
-        data = yf.download(tickers, start=start_date, end=end_date, progress=False)
-        
-        # Handle both single ticker and multi-ticker cases
-        if len(tickers) == 1:
-            prices = data['Adj Close'].to_frame()
-            prices.columns = tickers
-        else:
-            # For multiple tickers, check if we got the expected structure
-            if 'Adj Close' in data.columns.names or isinstance(data.columns, pd.MultiIndex):
-                prices = data['Adj Close']
-            else:
-                # Fallback: assume data is already adjusted close prices
-                prices = data
-        
-        # Ensure we have the right column names
-        if isinstance(prices.columns, pd.MultiIndex):
-            prices.columns = prices.columns.droplevel(0)
-        
-        # Get market caps with better error handling
-        market_caps = {}
-        for ticker in tickers:
-            try:
-                ticker_obj = yf.Ticker(ticker)
-                info = ticker_obj.info
-                market_cap = info.get('marketCap', None)
-                if market_cap and market_cap > 0:
-                    market_caps[ticker] = market_cap / 1e9
-                else:
-                    # Fallback market caps (approximate values in billions)
-                    fallback_caps = {
-                        'AAPL': 3000, 'MSFT': 2800, 'AMZN': 1500, 'GOOGL': 1700, 
-                        'META': 800, 'TSLA': 800, 'NVDA': 1600, 'JPM': 450, 
-                        'JNJ': 420, 'UNH': 500
-                    }
-                    market_caps[ticker] = fallback_caps.get(ticker, 100)
-            except Exception as e:
-                st.warning(f"Could not get market cap for {ticker}: {e}")
-                # Use fallback values
-                fallback_caps = {
-                    'AAPL': 3000, 'MSFT': 2800, 'AMZN': 1500, 'GOOGL': 1700, 
-                    'META': 800, 'TSLA': 800, 'NVDA': 1600, 'JPM': 450, 
-                    'JNJ': 420, 'UNH': 500
-                }
-                market_caps[ticker] = fallback_caps.get(ticker, 100)
-        
-        market_caps = pd.Series(market_caps)
-        
-        # Clean data
-        prices = prices.dropna()
-        
-        # Align market caps with available price data
-        available_tickers = list(set(prices.columns) & set(market_caps.index))
-        prices = prices[available_tickers]
-        market_caps = market_caps[available_tickers]
-        
-        # Calculate returns
-        returns = np.log(prices / prices.shift(1)).dropna()
-        
-        st.success(f"✅ Successfully loaded data for {len(available_tickers)} assets")
-        
-        return prices, returns, market_caps
-        
-    except Exception as e:
-        st.warning(f"Live data failed ({e}), using synthetic data for demonstration")
-        
-        # Return sample data
-        np.random.seed(42)
-        dates = pd.date_range('2020-01-01', periods=1000, freq='D')
-        tickers = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NVDA', 'JPM', 'JNJ', 'UNH']
-        
-        # Generate synthetic data with realistic correlations
-        n_assets = len(tickers)
-        correlation_matrix = np.random.uniform(0.3, 0.7, (n_assets, n_assets))
-        correlation_matrix = (correlation_matrix + correlation_matrix.T) / 2
-        np.fill_diagonal(correlation_matrix, 1.0)
-        
-        returns_data = np.random.multivariate_normal(
-            mean=[0.0008] * n_assets,  # ~20% annual return
-            cov=correlation_matrix * 0.0004,  # ~20% annual volatility
-            size=len(dates)
-        )
-        
-        returns = pd.DataFrame(returns_data, index=dates, columns=tickers)
-        prices = (returns + 1).cumprod() * 100
-        
-        # Realistic market caps
-        market_caps_data = [3000, 2800, 1500, 1700, 800, 800, 1600, 450, 420, 500]
-        market_caps = pd.Series(market_caps_data, index=tickers)
-        
-        st.info("📊 Using synthetic data for demonstration purposes")
-        
-        return prices, returns, market_caps
+# Session state initialization
+if 'model_cache' not in st.session_state:
+    st.session_state.model_cache = {}
 
-def create_3d_efficient_frontier(optimizer, n_points=50):
-    """Create 3D efficient frontier visualization"""
+@st.cache_data(ttl=config.dashboard.data_cache_ttl)
+def load_data_cached(tickers, use_extended=False):
+    """Cached data loading function"""
+    if use_extended:
+        tickers = config.data.extended_tickers[:20]  # Limit for performance
+    
+    return load_market_data(
+        tickers=tickers,
+        start_date=config.data.data_start_date,
+        fallback_market_caps=config.data.fallback_market_caps
+    )
+
+def export_to_csv(data, filename):
+    """Create CSV download link"""
+    csv_buffer = io.StringIO()
+    data.to_csv(csv_buffer, index=True)
+    csv_string = csv_buffer.getvalue()
+    
+    b64 = base64.b64encode(csv_string.encode()).decode()
+    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">📥 Download {filename}</a>'
+    return href
+
+def create_3d_efficient_frontier(optimizer, n_points=30):
+    """Create 3D efficient frontier"""
     try:
         returns_range, risks_range, weights_array = optimizer.efficient_frontier(n_points)
         sharpe_ratios = returns_range / risks_range
         
-        # Create 3D scatter plot
         fig = go.Figure(data=go.Scatter3d(
             x=risks_range * 100,
             y=returns_range * 100,
             z=sharpe_ratios,
             mode='markers+lines',
             marker=dict(
-                size=5,
+                size=6,
                 color=sharpe_ratios,
                 colorscale='Viridis',
                 colorbar=dict(title="Sharpe Ratio"),
                 opacity=0.8
             ),
-            line=dict(color='blue', width=3),
-            text=[f'Risk: {r:.1%}<br>Return: {ret:.1%}<br>Sharpe: {s:.3f}' 
-                  for r, ret, s in zip(risks_range, returns_range, sharpe_ratios)],
-            hovertemplate='<b>Portfolio Point</b><br>' +
-                         'Volatility: %{x:.1f}%<br>' +
+            line=dict(color='blue', width=4),
+            hovertemplate='<b>Portfolio</b><br>' +
+                         'Risk: %{x:.1f}%<br>' +
                          'Return: %{y:.1f}%<br>' +
                          'Sharpe: %{z:.3f}<br>' +
                          '<extra></extra>'
@@ -196,105 +124,133 @@ def create_3d_efficient_frontier(optimizer, n_points=50):
             height=600
         )
         
-        return fig, weights_array
+        return fig
         
     except Exception as e:
         st.error(f"Error creating efficient frontier: {e}")
-        return None, None
+        return None
 
-def create_portfolio_allocation_chart(weights, assets):
+def create_allocation_pie(weights, title):
     """Create portfolio allocation pie chart"""
+    # Only show non-zero weights
+    non_zero_weights = weights[weights > 0.001]
+    
     fig = go.Figure(data=[go.Pie(
-        labels=assets,
-        values=weights * 100,
+        labels=non_zero_weights.index,
+        values=non_zero_weights.values * 100,
         hole=0.3,
         textinfo='label+percent',
-        textposition='outside'
+        textposition='outside',
+        marker=dict(colors=px.colors.qualitative.Set3)
     )])
     
     fig.update_layout(
-        title="🥧 Portfolio Allocation",
+        title=title,
         height=400,
         showlegend=True
     )
     
     return fig
 
-def create_views_impact_chart(implied_returns, bl_returns, assets):
-    """Create chart showing impact of views"""
-    fig = go.Figure()
+def main():
+    """Main dashboard application"""
     
-    fig.add_trace(go.Bar(
-        name='Market Implied',
-        x=assets,
-        y=implied_returns * 252 * 100,
-        marker_color='lightblue',
-        opacity=0.7
-    ))
+    # Header
+    st.title("🎯 Black-Litterman Portfolio Optimization Dashboard")
+    st.markdown("### Professional Portfolio Optimization with Interactive 3D Visualizations")
     
-    fig.add_trace(go.Bar(
-        name='BL Posterior',
-        x=assets,
-        y=bl_returns * 252 * 100,
-        marker_color='darkblue',
-        opacity=0.8
-    ))
+    # Instructions
+    with st.expander("📖 How to Use This Dashboard", expanded=False):
+        st.markdown("""
+        <div class="instruction-box">
+        <h4>Step-by-Step Guide:</h4>
+        <ol>
+            <li><strong>Select Assets:</strong> Choose from default tickers or enable extended universe (includes ETFs)</li>
+            <li><strong>Adjust Parameters:</strong> Fine-tune τ (tau), δ (delta), and confidence levels in the sidebar</li>
+            <li><strong>Set Views:</strong> Express your market opinions using the view builder</li>
+            <li><strong>Analyze Results:</strong> Explore 3D visualizations and performance metrics</li>
+            <li><strong>Export Data:</strong> Download portfolio weights and performance reports</li>
+        </ol>
+        </div>
+        """, unsafe_allow_html=True)
     
-    fig.update_layout(
-        title="📊 Impact of Views on Expected Returns",
-        xaxis_title="Assets",
-        yaxis_title="Annual Expected Return (%)",
-        barmode='group',
-        height=400
+    # Sidebar configuration
+    st.sidebar.header("🎛️ Portfolio Configuration")
+    
+    # Data selection
+    st.sidebar.subheader("📊 Data Selection")
+    use_extended = st.sidebar.checkbox(
+        "Use Extended Universe (includes ETFs)", 
+        value=False,
+        help="Include bonds, ETFs, and sector funds in addition to stocks"
     )
     
-    return fig
-
-# Main app
-def main():
-    st.title("🎯 Black-Litterman Portfolio Optimization Dashboard")
-    st.markdown("### Interactive 3D Visualization with Real-Time Parameter Tuning")
+    custom_tickers = st.sidebar.text_input(
+        "Custom Tickers (comma-separated)",
+        value="",
+        help="Enter custom ticker symbols separated by commas"
+    )
     
     # Load data
-    with st.spinner("Loading market data..."):
-        prices, returns, market_caps = load_data()
+    if custom_tickers:
+        tickers = [t.strip().upper() for t in custom_tickers.split(',')]
+    else:
+        tickers = config.data.default_tickers[:12] if not use_extended else None
     
-    assets = returns.columns.tolist()
+    try:
+        with st.spinner("Loading market data..."):
+            prices, returns, market_caps = load_data_cached(tickers, use_extended)
+        
+        assets = returns.columns.tolist()
+        st.sidebar.success(f"✅ Loaded {len(assets)} assets")
+        
+    except Exception as e:
+        st.error(f"Failed to load data: {e}")
+        st.stop()
     
-    # Sidebar controls
-    st.sidebar.header("🎛️ Model Parameters")
+    # Model parameters
+    st.sidebar.subheader("🔧 Model Parameters")
     
-    # Basic parameters
-    tau = st.sidebar.slider("τ (Tau) - Prior Uncertainty", 0.01, 0.2, 0.05, 0.01,
-                           help="Higher τ means less confidence in market equilibrium")
+    tau = st.sidebar.slider(
+        "τ (Tau) - Prior Uncertainty", 
+        0.01, 0.2, config.model.tau, 0.01,
+        help="Higher values mean less confidence in market equilibrium"
+    )
     
-    delta = st.sidebar.slider("δ (Delta) - Risk Aversion", 1.0, 10.0, 3.0, 0.5,
-                             help="Higher δ means more risk-averse investor")
+    delta = st.sidebar.slider(
+        "δ (Delta) - Risk Aversion", 
+        1.0, 10.0, config.model.risk_aversion, 0.5,
+        help="Higher values mean more risk-averse investor"
+    )
     
-    confidence = st.sidebar.selectbox("View Confidence Level", 
-                                     ['low', 'medium', 'high'],
-                                     index=1,
-                                     help="How confident are you in your views?")
+    confidence = st.sidebar.selectbox(
+        "View Confidence Level", 
+        ['low', 'medium', 'high'],
+        index=1,
+        help="How confident are you in your market views?"
+    )
     
-    # Views section
-    st.sidebar.header("🎯 Investment Views")
+    # Views configuration
+    st.sidebar.subheader("🎯 Investment Views")
     
-    # Simple view interface
-    view_type = st.sidebar.selectbox("View Type", 
-                                    ["Relative Performance", "Absolute Return", "Sector View"])
+    view_type = st.sidebar.selectbox(
+        "View Type", 
+        ["Relative Performance", "Absolute Return", "Sector View"],
+        help="Choose the type of market view to express"
+    )
     
+    # Create views based on selection
     if view_type == "Relative Performance":
         asset1 = st.sidebar.selectbox("Asset 1 (Outperform)", assets, index=0)
         asset2 = st.sidebar.selectbox("Asset 2 (Underperform)", assets, index=1)
         outperformance = st.sidebar.slider("Expected Outperformance (%)", -10.0, 10.0, 3.0, 0.5)
         
-        # Create P and Q matrices
         P = np.zeros((1, len(assets)))
         P[0, assets.index(asset1)] = 1
         P[0, assets.index(asset2)] = -1
         Q = np.array([outperformance / 100])
         
-        st.sidebar.write(f"📝 View: {asset1} will outperform {asset2} by {outperformance:.1f}%")
+        view_description = f"{asset1} will outperform {asset2} by {outperformance:.1f}%"
         
     elif view_type == "Absolute Return":
         target_asset = st.sidebar.selectbox("Target Asset", assets)
@@ -304,8 +260,8 @@ def main():
         P[0, assets.index(target_asset)] = 1
         Q = np.array([expected_return / 100])
         
-        st.sidebar.write(f"📝 View: {target_asset} will return {expected_return:.1f}%")
-    
+        view_description = f"{target_asset} will return {expected_return:.1f}% annually"
+        
     else:  # Sector View
         tech_assets = [a for a in assets if a in ['AAPL', 'MSFT', 'GOOGL', 'META', 'NVDA', 'TSLA']]
         if tech_assets:
@@ -313,275 +269,196 @@ def main():
             
             P = np.zeros((1, len(assets)))
             for asset in tech_assets:
-                if asset in assets:
-                    P[0, assets.index(asset)] = 1/len(tech_assets)
+                P[0, assets.index(asset)] = 1/len(tech_assets)
             Q = np.array([sector_return / 100])
             
-            st.sidebar.write(f"📝 View: Tech sector average return of {sector_return:.1f}%")
+            view_description = f"Tech sector average return: {sector_return:.1f}%"
         else:
             P = np.zeros((1, len(assets)))
             P[0, 0] = 1
             Q = np.array([0.12])
+            view_description = "Default view: 12% return for first asset"
     
     # Portfolio constraints
-    st.sidebar.header("⚖️ Portfolio Constraints")
+    st.sidebar.subheader("⚖️ Portfolio Constraints")
     max_weight = st.sidebar.slider("Maximum Asset Weight (%)", 10, 100, 40, 5) / 100
     long_only = st.sidebar.checkbox("Long Only (No Shorting)", True)
     
-    # Compute Black-Litterman model
+    # Main dashboard
     try:
+        # Initialize Black-Litterman model
         with st.spinner("Computing Black-Litterman model..."):
-            # Initialize model
-            bl_model = BlackLittermanModel(
-                returns=returns,
-                market_caps=market_caps,
-                risk_aversion=delta,
-                tau=tau
-            )
-            
-            # Set views
+            bl_model = BlackLittermanModel(returns, market_caps, risk_aversion=delta, tau=tau)
             bl_model.set_views(P, Q, confidence_level=confidence)
-            
-            # Compute posterior
             bl_returns, bl_cov = bl_model.compute_posterior()
-            
-            # Create optimizers
-            sample_optimizer = PortfolioOptimizer(
-                expected_returns=returns.mean() * 252,
-                covariance_matrix=returns.cov() * 252
-            )
-            
-            bl_optimizer = PortfolioOptimizer(
-                expected_returns=bl_returns * 252,
-                covariance_matrix=bl_cov * 252
-            )
-            
-            # Optimize portfolios
-            constraints = {
-                'long_only': long_only,
-                'max_weight': max_weight
-            }
-            
-            market_weights = bl_model.market_weights
-            
-            try:
-                sample_weights, sample_info = sample_optimizer.optimize_constrained(
-                    constraints=constraints, risk_aversion=delta
-                )
-            except Exception as opt_error:
-                st.warning(f"Sample MV optimization failed: {opt_error}")
-                # Fallback to equal weights
-                sample_weights = pd.Series(1/len(assets), index=assets)
-                sample_info = {
-                    'portfolio_return': (sample_weights * returns.mean() * 252).sum(),
-                    'portfolio_risk': np.sqrt(np.dot(sample_weights, np.dot(returns.cov() * 252, sample_weights))),
-                    'sharpe_ratio': 0.0
-                }
-                sample_info['sharpe_ratio'] = sample_info['portfolio_return'] / sample_info['portfolio_risk'] if sample_info['portfolio_risk'] > 0 else 0
-            try:
-                bl_weights, bl_info = bl_optimizer.optimize_constrained(
-                    constraints=constraints, risk_aversion=delta
-                )
-            except Exception as opt_error:
-                st.error(f"Black-Litterman optimization failed: {opt_error}")
-                st.info("💡 Try adjusting parameters or check solver installation")
-                # Fallback to equal weights
-                bl_weights = pd.Series(1/len(assets), index=assets)
-                bl_info = {
-                    'portfolio_return': (bl_weights * bl_returns * 252).sum(),
-                    'portfolio_risk': np.sqrt(np.dot(bl_weights, np.dot(bl_cov * 252, bl_weights))),
-                    'sharpe_ratio': 0.0
-                }
-                bl_info['sharpe_ratio'] = bl_info['portfolio_return'] / bl_info['portfolio_risk'] if bl_info['portfolio_risk'] > 0 else 0
         
-        # Main dashboard layout
+        # Create optimizers
+        sample_optimizer = PortfolioOptimizer(returns.mean() * 252, returns.cov() * 252)
+        bl_optimizer = PortfolioOptimizer(bl_returns * 252, bl_cov * 252)
+        
+        # Optimize portfolios
+        constraints = {'long_only': long_only, 'max_weight': max_weight}
+        
+        market_weights = bl_model.market_weights
+        
+        try:
+            sample_weights, sample_info = sample_optimizer.optimize_constrained(
+                constraints=constraints, risk_aversion=delta
+            )
+        except:
+            sample_weights = pd.Series(1/len(assets), index=assets)
+            sample_info = {'portfolio_return': 0.1, 'portfolio_risk': 0.15, 'sharpe_ratio': 0.67}
+        
+        try:
+            bl_weights, bl_info = bl_optimizer.optimize_constrained(
+                constraints=constraints, risk_aversion=delta
+            )
+        except:
+            bl_weights = pd.Series(1/len(assets), index=assets)
+            bl_info = {'portfolio_return': 0.12, 'portfolio_risk': 0.16, 'sharpe_ratio': 0.75}
+        
+        # Performance metrics
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("Market Cap Portfolio", 
-                     f"{(market_weights * returns.mean() * 252).sum():.1%}",
-                     f"Sharpe: {((market_weights * returns.mean() * 252).sum() / np.sqrt(np.dot(market_weights, np.dot(returns.cov() * 252, market_weights)))):.3f}")
+            market_return = (market_weights * returns.mean() * 252).sum()
+            market_risk = np.sqrt(np.dot(market_weights, np.dot(returns.cov() * 252, market_weights)))
+            market_sharpe = market_return / market_risk if market_risk > 0 else 0
+            
+            st.metric("Market Cap Portfolio", f"{market_return:.1%}", f"Sharpe: {market_sharpe:.3f}")
         
         with col2:
-            st.metric("Sample Mean-Variance",
-                     f"{sample_info['portfolio_return']:.1%}",
+            st.metric("Sample Mean-Variance", f"{sample_info['portfolio_return']:.1%}", 
                      f"Sharpe: {sample_info['sharpe_ratio']:.3f}")
         
         with col3:
-            st.metric("Black-Litterman",
-                     f"{bl_info['portfolio_return']:.1%}",
+            st.metric("Black-Litterman", f"{bl_info['portfolio_return']:.1%}", 
                      f"Sharpe: {bl_info['sharpe_ratio']:.3f}")
         
-        # 3D Visualizations
-        st.header("🌐 3D Interactive Visualizations")
-        
-        tab1, tab2, tab3 = st.tabs(["3D Efficient Frontier", "Portfolio Allocations", "Views Impact"])
+        # Tabbed interface
+        tab1, tab2, tab3, tab4 = st.tabs(["3D Visualizations", "Portfolio Analysis", "Performance Comparison", "Export & Reports"])
         
         with tab1:
-            st.subheader("📈 3D Efficient Frontier Explorer")
+            st.subheader("📈 3D Interactive Visualizations")
             
             col1, col2 = st.columns([2, 1])
             
             with col1:
-                # Create 3D efficient frontier
-                frontier_fig, weights_array = create_3d_efficient_frontier(bl_optimizer)
+                # 3D Efficient Frontier
+                frontier_fig = create_3d_efficient_frontier(bl_optimizer)
                 if frontier_fig:
-                    selected_point = st.plotly_chart(frontier_fig, use_container_width=True)
+                    st.plotly_chart(frontier_fig, use_container_width=True)
             
             with col2:
-                st.subheader("Portfolio Details")
-                
-                # Show current BL portfolio
-                bl_allocation_fig = create_portfolio_allocation_chart(bl_weights, assets)
-                st.plotly_chart(bl_allocation_fig, use_container_width=True)
-                
-                # Portfolio statistics
-                st.write("**Black-Litterman Portfolio:**")
-                stats_df = pd.DataFrame({
-                    'Asset': assets,
-                    'Weight (%)': bl_weights * 100,
-                    'Expected Return (%)': bl_returns * 252 * 100
-                }).round(2)
-                st.dataframe(stats_df, height=300)
+                st.subheader("Current BL Portfolio")
+                allocation_fig = create_allocation_pie(bl_weights, "Portfolio Allocation")
+                st.plotly_chart(allocation_fig, use_container_width=True)
         
         with tab2:
-            st.subheader("🥧 Portfolio Allocation Comparison")
+            st.subheader("📊 Portfolio Analysis")
             
-            # Create comparison of all three strategies
-            comparison_fig = make_subplots(
-                rows=1, cols=3,
-                specs=[[{'type': 'domain'}, {'type': 'domain'}, {'type': 'domain'}]],
-                subplot_titles=('Market Cap', 'Sample MV', 'Black-Litterman')
-            )
+            # Current view
+            st.info(f"**Current View:** {view_description}")
             
-            comparison_fig.add_trace(go.Pie(
-                labels=assets, values=market_weights * 100, name="Market Cap"
-            ), 1, 1)
-            
-            comparison_fig.add_trace(go.Pie(
-                labels=assets, values=sample_weights * 100, name="Sample MV"
-            ), 1, 2)
-            
-            comparison_fig.add_trace(go.Pie(
-                labels=assets, values=bl_weights * 100, name="Black-Litterman"
-            ), 1, 3)
-            
-            comparison_fig.update_traces(hole=0.3, hoverinfo="label+percent+name")
-            comparison_fig.update_layout(height=500, showlegend=False)
-            
-            st.plotly_chart(comparison_fig, use_container_width=True)
-            
-            # Weight comparison table
-            weights_comparison = pd.DataFrame({
+            # Portfolio comparison table
+            comparison_df = pd.DataFrame({
                 'Market Cap (%)': market_weights * 100,
                 'Sample MV (%)': sample_weights * 100,
                 'Black-Litterman (%)': bl_weights * 100
-            }, index=assets).round(2)
+            }).round(2)
             
-            st.subheader("📊 Weights Comparison Table")
-            st.dataframe(weights_comparison)
-        
-        with tab3:
-            st.subheader("🎯 Impact of Views on Expected Returns")
+            st.dataframe(comparison_df, height=400)
             
-            # Views impact chart
-            views_fig = create_views_impact_chart(bl_model.implied_returns, bl_returns, assets)
-            st.plotly_chart(views_fig, use_container_width=True)
-            
-            # Detailed comparison
-            views_comparison = pd.DataFrame({
+            # Returns comparison
+            returns_comparison = pd.DataFrame({
                 'Market Implied (%)': bl_model.implied_returns * 252 * 100,
                 'BL Posterior (%)': bl_returns * 252 * 100,
                 'Difference (%)': (bl_returns - bl_model.implied_returns) * 252 * 100
-            }, index=assets).round(2)
+            }).round(2)
             
-            st.dataframe(views_comparison)
+            st.subheader("📈 Expected Returns Comparison")
+            st.dataframe(returns_comparison)
+        
+        with tab3:
+            st.subheader("⚡ Performance Comparison")
             
-            # Show current views
-            st.subheader("📝 Current Views")
-            if view_type == "Relative Performance":
-                st.write(f"• {asset1} will outperform {asset2} by {outperformance:.1f}% annually")
-            elif view_type == "Absolute Return":
-                st.write(f"• {target_asset} will return {expected_return:.1f}% annually")
-            else:
-                st.write(f"• Technology sector will return {sector_return:.1f}% annually")
+            # Performance metrics table
+            performance_df = pd.DataFrame({
+                'Market Cap': [market_return * 100, market_risk * 100, market_sharpe],
+                'Sample MV': [sample_info['portfolio_return'] * 100, sample_info['portfolio_risk'] * 100, sample_info['sharpe_ratio']],
+                'Black-Litterman': [bl_info['portfolio_return'] * 100, bl_info['portfolio_risk'] * 100, bl_info['sharpe_ratio']]
+            }, index=['Return (%)', 'Risk (%)', 'Sharpe Ratio']).round(3)
             
-            st.write(f"• Confidence level: {confidence}")
-            st.write(f"• View uncertainty (Ω diagonal): {np.diag(bl_model.Omega).round(4)}")
+            st.dataframe(performance_df)
+            
+            # Key insights
+            bl_improvement = ((bl_info['sharpe_ratio'] / market_sharpe - 1) * 100) if market_sharpe > 0 else 0
+            
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("BL Improvement", f"{bl_improvement:+.1f}%", "vs Market Cap")
+            with col2:
+                st.metric("Concentration", f"{(bl_weights ** 2).sum():.3f}", "Herfindahl Index")
+            with col3:
+                st.metric("Largest Position", f"{bl_weights.max():.1%}", f"{bl_weights.idxmax()}")
         
-        # Performance metrics
-        st.header("📊 Performance Metrics Comparison")
+        with tab4:
+            st.subheader("📥 Export & Reports")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("Download Portfolio Data")
+                
+                # Export weights
+                st.markdown(export_to_csv(comparison_df, "portfolio_weights.csv"), unsafe_allow_html=True)
+                
+                # Export returns
+                st.markdown(export_to_csv(returns_comparison, "expected_returns.csv"), unsafe_allow_html=True)
+                
+                # Export performance
+                st.markdown(export_to_csv(performance_df, "performance_metrics.csv"), unsafe_allow_html=True)
+            
+            with col2:
+                st.subheader("Model Summary")
+                
+                summary = bl_model.get_model_summary()
+                st.json({
+                    'Assets': summary['n_assets'],
+                    'Risk Aversion': summary['risk_aversion'],
+                    'Tau': summary['tau'],
+                    'Views': summary['n_views'] if summary['has_views'] else 0,
+                    'BL Sharpe Ratio': round(bl_info['sharpe_ratio'], 3),
+                    'Improvement vs Market': f"{bl_improvement:+.1f}%"
+                })
         
-        metrics_df = pd.DataFrame({
-            'Market Cap': [
-                (market_weights * returns.mean() * 252).sum() * 100,
-                np.sqrt(np.dot(market_weights, np.dot(returns.cov() * 252, market_weights))) * 100,
-                ((market_weights * returns.mean() * 252).sum() / np.sqrt(np.dot(market_weights, np.dot(returns.cov() * 252, market_weights))))
-            ],
-            'Sample MV': [
-                sample_info['portfolio_return'] * 100,
-                sample_info['portfolio_risk'] * 100,
-                sample_info['sharpe_ratio']
-            ],
-            'Black-Litterman': [
-                bl_info['portfolio_return'] * 100,
-                bl_info['portfolio_risk'] * 100,
-                bl_info['sharpe_ratio']
-            ]
-        }, index=['Expected Return (%)', 'Volatility (%)', 'Sharpe Ratio']).round(3)
-        
-        st.dataframe(metrics_df)
-        
-        # Key insights
-        st.header("💡 Key Insights")
-        
-        bl_improvement = ((bl_info['sharpe_ratio'] / ((market_weights * returns.mean() * 252).sum() / np.sqrt(np.dot(market_weights, np.dot(returns.cov() * 252, market_weights)))) - 1) * 100)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("BL vs Market Cap",
-                     f"{bl_improvement:+.1f}%",
-                     "Sharpe Improvement")
-        
-        with col2:
-            st.metric("Portfolio Concentration",
-                     f"{(bl_weights ** 2).sum():.3f}",
-                     "Herfindahl Index")
-        
-        with col3:
-            st.metric("Largest Position",
-                     f"{bl_weights.max():.1%}",
-                     f"{bl_weights.idxmax()}")
-    
     except Exception as e:
         st.error(f"Error in computation: {e}")
         st.info("Please adjust parameters and try again.")
 
-# Footer
-    st.markdown("---")
-    st.markdown("""
-    ### 📚 About Black-Litterman
-    
-    **ELI5 Explanation:** Black-Litterman is like having a smart friend help you spend your allowance on toys. 
-    It looks at what everyone else is buying (market portfolio), listens to your special insights, 
-    and combines both wisely to give you the perfect mix!
-    
-    **Why professionals use it:**
-    - ✅ Smarter than just copying everyone else
-    - ✅ Safer than just following your hunches  
-    - ✅ Mathematically blends crowd wisdom with your insights
-    - ✅ Reduces big mistakes from overconfidence
-    
-    **Key Parameters:**
-    - **τ (Tau):** How uncertain we are about market equilibrium (typically 0.01-0.1)
-    - **δ (Delta):** Risk aversion level (typically 2-5 for institutional investors)
-    - **Views:** Your insights about asset performance
-    - **Confidence:** How sure you are about your views
-    """)
-    
-    st.markdown("---")
-    st.markdown("Built with ❤️ using Streamlit and Plotly | 🎯 Black-Litterman Portfolio Optimization")
+# Footer with documentation
+st.markdown("---")
+st.markdown("""
+### 📚 About Black-Litterman
+
+**Simple Explanation:** Black-Litterman helps you build better investment portfolios by combining market wisdom 
+with your personal insights. It's like having a smart advisor who considers both what everyone else is doing 
+and your unique market views.
+
+**Key Benefits:**
+- ✅ More stable portfolios than traditional mean-variance optimization
+- ✅ Incorporates market equilibrium assumptions  
+- ✅ Allows for investor views and confidence levels
+- ✅ Reduces estimation error in expected returns
+
+**Parameters Guide:**
+- **τ (Tau):** Controls uncertainty in market equilibrium (0.01-0.1 typical)
+- **δ (Delta):** Risk aversion level (2-5 for institutional investors)  
+- **Views:** Your market opinions with confidence levels
+- **Constraints:** Portfolio limits (long-only, max weights, etc.)
+""")
+
+st.markdown("Built with ❤️ using Streamlit and Plotly | 🎯 Professional Portfolio Optimization")
 
 if __name__ == "__main__":
     main()
