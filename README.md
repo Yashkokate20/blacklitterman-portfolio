@@ -5,7 +5,6 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Deploy](https://img.shields.io/badge/Deploy-Streamlit%20Cloud-brightgreen.svg)](https://streamlit.io/cloud)
 
-## 🌟 Explain Like I'm 11: What is Black-Litterman?
 
 Imagine you're trying to decide how to spend your allowance on different toys. You know:
 - **What toys cost** (like stock prices)
