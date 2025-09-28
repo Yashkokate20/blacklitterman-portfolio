@@ -4,40 +4,43 @@ Enhanced Black-Litterman Portfolio Optimization Dashboard - FIXED VERSION
 Professional-grade Streamlit application with working 3D visualizations.
 """
 
-import streamlit as st
-import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
-from plotly.subplots import make_subplots
+import base64
+import io
 import sys
 import warnings
-import io
-import base64
-from datetime import datetime, timedelta
+# from datetime import datetime, timedelta  # Currently unused
 
-warnings.filterwarnings('ignore')
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+# from plotly.subplots import make_subplots  # Currently unused
+
+warnings.filterwarnings("ignore")
 
 # Add src to path
-sys.path.append('src')
+sys.path.append("src")
+
+# from backtesting import BacktestEngine  # Currently unused
 
 # Import our modules
 from black_litterman import BlackLittermanModel
-from portfolio_optimization import PortfolioOptimizer
-from backtesting import BacktestEngine
-from utils import load_market_data, calculate_performance_metrics
 from config import config
+from portfolio_optimization import PortfolioOptimizer
+from utils import load_market_data
 
 # Page configuration
 st.set_page_config(
     page_title="Black-Litterman Portfolio Optimizer",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Custom CSS for professional styling
-st.markdown("""
+st.markdown(
+    """
 <style>
 /* Main app styling with perfect spacing */
 .main .block-container {
@@ -155,246 +158,266 @@ h3 {
     font-weight: bold;
 }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Session state initialization
-if 'model_cache' not in st.session_state:
+if "model_cache" not in st.session_state:
     st.session_state.model_cache = {}
+
 
 @st.cache_data(ttl=config.dashboard.data_cache_ttl)
 def load_data_cached(tickers, use_extended=False):
     """Cached data loading function"""
     if use_extended:
         tickers = config.data.extended_tickers[:20]  # Limit for performance
-    
+
     return load_market_data(
         tickers=tickers,
         start_date=config.data.data_start_date,
-        fallback_market_caps=config.data.fallback_market_caps
+        fallback_market_caps=config.data.fallback_market_caps,
     )
+
 
 def export_to_csv(data, filename):
     """Create CSV download link"""
     csv_buffer = io.StringIO()
     data.to_csv(csv_buffer, index=True)
     csv_string = csv_buffer.getvalue()
-    
+
     b64 = base64.b64encode(csv_string.encode()).decode()
     href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">📥 Download {filename}</a>'
     return href
+
 
 def create_3d_efficient_frontier(optimizer, n_points=25):
     """Create working 3D efficient frontier visualization"""
     try:
         # Get efficient frontier data
-        returns_range, risks_range, weights_array = optimizer.efficient_frontier(n_points)
+        returns_range, risks_range, weights_array = optimizer.efficient_frontier(
+            n_points
+        )
         sharpe_ratios = returns_range / risks_range
-        
+
         # Create the main figure
         fig = go.Figure()
-        
+
         # Add main efficient frontier
         fig.add_trace(
             go.Scatter3d(
                 x=risks_range * 100,
                 y=returns_range * 100,
                 z=sharpe_ratios,
-                mode='markers+lines',
+                mode="markers+lines",
                 marker=dict(
                     size=10,
                     color=sharpe_ratios,
-                    colorscale='Plasma',
+                    colorscale="Plasma",
                     colorbar=dict(title="Sharpe Ratio"),
-                    opacity=0.9
+                    opacity=0.9,
                 ),
-                line=dict(color='white', width=4),
-                name='Efficient Frontier',
-                hovertemplate='<b>Optimal Portfolio</b><br>' +
-                             'Risk: %{x:.1f}%<br>' +
-                             'Return: %{y:.1f}%<br>' +
-                             'Sharpe: %{z:.3f}<br>' +
-                             '<extra></extra>'
+                line=dict(color="white", width=4),
+                name="Efficient Frontier",
+                hovertemplate="<b>Optimal Portfolio</b><br>"
+                + "Risk: %{x:.1f}%<br>"
+                + "Return: %{y:.1f}%<br>"
+                + "Sharpe: %{z:.3f}<br>"
+                + "<extra></extra>",
             )
         )
-        
+
         # Add random portfolios for context
         np.random.seed(42)
         n_random = 15
-        random_risks = np.random.uniform(risks_range.min(), risks_range.max(), n_random) * 100
-        random_returns = np.random.uniform(returns_range.min(), returns_range.max(), n_random) * 100
+        random_risks = (
+            np.random.uniform(risks_range.min(), risks_range.max(), n_random) * 100
+        )
+        random_returns = (
+            np.random.uniform(returns_range.min(), returns_range.max(), n_random) * 100
+        )
         random_sharpes = random_returns / random_risks
-        
+
         fig.add_trace(
             go.Scatter3d(
                 x=random_risks,
                 y=random_returns,
                 z=random_sharpes,
-                mode='markers',
-                marker=dict(
-                    size=6,
-                    color='lightblue',
-                    opacity=0.6
-                ),
-                name='Random Portfolios',
-                hovertemplate='<b>Random Portfolio</b><br>' +
-                             'Risk: %{x:.1f}%<br>' +
-                             'Return: %{y:.1f}%<br>' +
-                             'Sharpe: %{z:.3f}<br>' +
-                             '<extra></extra>'
+                mode="markers",
+                marker=dict(size=6, color="lightblue", opacity=0.6),
+                name="Random Portfolios",
+                hovertemplate="<b>Random Portfolio</b><br>"
+                + "Risk: %{x:.1f}%<br>"
+                + "Return: %{y:.1f}%<br>"
+                + "Sharpe: %{z:.3f}<br>"
+                + "<extra></extra>",
             )
         )
-        
+
         # Update layout with professional spacing and margins
         fig.update_layout(
             title={
-                'text': "🚀 3D Portfolio Optimization Universe",
-                'x': 0.5,
-                'y': 0.95,  # Position title with proper spacing
-                'xanchor': 'center',
-                'yanchor': 'top',
-                'font': {'size': 22, 'color': 'white', 'family': 'Arial, sans-serif'}
+                "text": "🚀 3D Portfolio Optimization Universe",
+                "x": 0.5,
+                "y": 0.95,  # Position title with proper spacing
+                "xanchor": "center",
+                "yanchor": "top",
+                "font": {"size": 22, "color": "white", "family": "Arial, sans-serif"},
             },
             scene=dict(
                 xaxis=dict(
-                    title=dict(text="Risk (%)", font=dict(color='white', size=14)),
+                    title=dict(text="Risk (%)", font=dict(color="white", size=14)),
                     backgroundcolor="rgba(0,0,0,0.8)",
                     gridcolor="rgba(255,255,255,0.3)",
                     gridwidth=1,
-                    tickfont=dict(color='white', size=11),
+                    tickfont=dict(color="white", size=11),
                     showbackground=True,
                     showgrid=True,
-                    zeroline=False
+                    zeroline=False,
                 ),
                 yaxis=dict(
-                    title=dict(text="Return (%)", font=dict(color='white', size=14)),
+                    title=dict(text="Return (%)", font=dict(color="white", size=14)),
                     backgroundcolor="rgba(0,0,0,0.8)",
                     gridcolor="rgba(255,255,255,0.3)",
                     gridwidth=1,
-                    tickfont=dict(color='white', size=11),
+                    tickfont=dict(color="white", size=11),
                     showbackground=True,
                     showgrid=True,
-                    zeroline=False
+                    zeroline=False,
                 ),
                 zaxis=dict(
-                    title=dict(text="Sharpe Ratio", font=dict(color='white', size=14)),
+                    title=dict(text="Sharpe Ratio", font=dict(color="white", size=14)),
                     backgroundcolor="rgba(0,0,0,0.8)",
                     gridcolor="rgba(255,255,255,0.3)",
                     gridwidth=1,
-                    tickfont=dict(color='white', size=11),
+                    tickfont=dict(color="white", size=11),
                     showbackground=True,
                     showgrid=True,
-                    zeroline=False
+                    zeroline=False,
                 ),
                 bgcolor="rgba(0,0,0,0.9)",
                 camera=dict(
                     eye=dict(x=1.8, y=1.8, z=1.5),
                     up=dict(x=0, y=0, z=1),
-                    center=dict(x=0, y=0, z=0)
+                    center=dict(x=0, y=0, z=0),
                 ),
-                aspectmode='cube',
-                aspectratio=dict(x=1, y=1, z=0.8)
+                aspectmode="cube",
+                aspectratio=dict(x=1, y=1, z=0.8),
             ),
             height=650,  # Increased height for better visibility
             width=None,  # Auto-width for responsiveness
             margin=dict(l=50, r=50, t=80, b=50),  # Professional margins
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white', family='Arial, sans-serif'),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white", family="Arial, sans-serif"),
             showlegend=True,
             legend=dict(
                 x=0.02,
                 y=0.98,
-                xanchor='left',
-                yanchor='top',
+                xanchor="left",
+                yanchor="top",
                 bgcolor="rgba(0,0,0,0.8)",
                 bordercolor="rgba(255,255,255,0.3)",
                 borderwidth=1,
-                font=dict(color="white", size=12)
-            )
+                font=dict(color="white", size=12),
+            ),
         )
-        
+
         return fig
-        
+
     except Exception as e:
         st.error(f"Error creating 3D visualization: {e}")
         return create_fallback_chart()
 
+
 def create_fallback_chart():
     """Create simple fallback chart"""
     fig = go.Figure()
-    
+
     # Simple 3D scatter
     x = [10, 15, 20, 25, 30]
     y = [8, 12, 15, 18, 22]
     z = [0.5, 0.7, 0.8, 0.9, 0.85]
-    
-    fig.add_trace(go.Scatter3d(
-        x=x, y=y, z=z,
-        mode='markers+lines',
-        marker=dict(size=8, color='blue'),
-        name='Sample Portfolio Path'
-    ))
-    
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=x,
+            y=y,
+            z=z,
+            mode="markers+lines",
+            marker=dict(size=8, color="blue"),
+            name="Sample Portfolio Path",
+        )
+    )
+
     fig.update_layout(
         title="📊 3D Portfolio Visualization",
         scene=dict(
-            xaxis=dict(title=dict(text="Risk (%)", font=dict(color='white'))),
-            yaxis=dict(title=dict(text="Return (%)", font=dict(color='white'))),
-            zaxis=dict(title=dict(text="Sharpe Ratio", font=dict(color='white'))),
-            bgcolor="rgba(0,0,0,0.9)"
+            xaxis=dict(title=dict(text="Risk (%)", font=dict(color="white"))),
+            yaxis=dict(title=dict(text="Return (%)", font=dict(color="white"))),
+            zaxis=dict(title=dict(text="Sharpe Ratio", font=dict(color="white"))),
+            bgcolor="rgba(0,0,0,0.9)",
         ),
         height=600,
-        paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white')
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="white"),
     )
-    
+
     return fig
+
 
 def create_allocation_pie(weights, title):
     """Create enhanced portfolio allocation pie chart with perfect spacing"""
     # Only show non-zero weights
     non_zero_weights = weights[weights > 0.001]
-    
+
     # Add 'Others' category if there are small weights
     other_weight = weights[weights <= 0.001].sum()
     if other_weight > 0:
-        non_zero_weights['Others'] = other_weight
-    
-    fig = go.Figure(data=[go.Pie(
-        labels=non_zero_weights.index,
-        values=non_zero_weights.values * 100,
-        hole=0.45,  # Slightly larger hole for better proportions
-        textinfo='label+percent',
-        textposition='outside',
-        textfont=dict(size=11, color='white'),
-        marker=dict(
-            colors=px.colors.qualitative.Set3,
-            line=dict(color='white', width=3)  # Thicker borders for clarity
-        ),
-        pull=[0.1 if i == non_zero_weights.values.argmax() else 0 for i in range(len(non_zero_weights))],
-        sort=False,  # Maintain order for consistency
-        direction='clockwise',
-        hovertemplate='<b>%{label}</b><br>' +
-                      'Weight: %{value:.1f}%<br>' +
-                      'Percentage: %{percent}<br>' +
-                      '<extra></extra>'
-    )])
-    
+        non_zero_weights["Others"] = other_weight
+
+    fig = go.Figure(
+        data=[
+            go.Pie(
+                labels=non_zero_weights.index,
+                values=non_zero_weights.values * 100,
+                hole=0.45,  # Slightly larger hole for better proportions
+                textinfo="label+percent",
+                textposition="outside",
+                textfont=dict(size=11, color="white"),
+                marker=dict(
+                    colors=px.colors.qualitative.Set3,
+                    line=dict(color="white", width=3),  # Thicker borders for clarity
+                ),
+                pull=[
+                    0.1 if i == non_zero_weights.values.argmax() else 0
+                    for i in range(len(non_zero_weights))
+                ],
+                sort=False,  # Maintain order for consistency
+                direction="clockwise",
+                hovertemplate="<b>%{label}</b><br>"
+                + "Weight: %{value:.1f}%<br>"
+                + "Percentage: %{percent}<br>"
+                + "<extra></extra>",
+            )
+        ]
+    )
+
     fig.update_layout(
         title={
-            'text': f"💼 {title}",
-            'x': 0.5,
-            'y': 0.95,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            'font': {'size': 18, 'color': 'white', 'family': 'Arial, sans-serif'}
+            "text": f"💼 {title}",
+            "x": 0.5,
+            "y": 0.95,
+            "xanchor": "center",
+            "yanchor": "top",
+            "font": {"size": 18, "color": "white", "family": "Arial, sans-serif"},
         },
         height=450,  # Increased height for better spacing
-        width=None,   # Auto-width for responsiveness
+        width=None,  # Auto-width for responsiveness
         margin=dict(l=40, r=40, t=60, b=40),  # Professional margins
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white', size=12, family='Arial, sans-serif'),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="white", size=12, family="Arial, sans-serif"),
         showlegend=True,
         legend=dict(
             orientation="v",
@@ -405,33 +428,38 @@ def create_allocation_pie(weights, title):
             bgcolor="rgba(0,0,0,0.8)",
             bordercolor="rgba(255,255,255,0.3)",
             borderwidth=1,
-            font=dict(size=10)
+            font=dict(size=10),
         ),
         annotations=[
             dict(
                 text=f'<b>Active</b><br><span style="font-size:16px">{len(non_zero_weights)}</span><br><span style="font-size:9px">Positions</span>',
-                x=0.5, y=0.5,
+                x=0.5,
+                y=0.5,
                 font_size=12,
-                font_color='white',
-                font_family='Arial, sans-serif',
+                font_color="white",
+                font_family="Arial, sans-serif",
                 showarrow=False,
-                align='center'
+                align="center",
             )
-        ]
+        ],
     )
-    
+
     return fig
+
 
 def main():
     """Main dashboard application"""
-    
+
     # Header
     st.title("🎯 Black-Litterman Portfolio Optimization Dashboard")
-    st.markdown("### Professional Portfolio Optimization with Interactive 3D Visualizations")
-    
+    st.markdown(
+        "### Professional Portfolio Optimization with Interactive 3D Visualizations"
+    )
+
     # Instructions
     with st.expander("📖 How to Use This Dashboard", expanded=False):
-        st.markdown("""
+        st.markdown(
+            """
         <div class="instruction-box">
         <h4>Step-by-Step Guide:</h4>
         <ol>
@@ -442,179 +470,226 @@ def main():
             <li><strong>Export Data:</strong> Download portfolio weights and performance reports</li>
         </ol>
         </div>
-        """, unsafe_allow_html=True)
-    
+        """,
+            unsafe_allow_html=True,
+        )
+
     # Sidebar configuration
     st.sidebar.header("🎛️ Portfolio Configuration")
-    
+
     # Data selection
     st.sidebar.subheader("📊 Data Selection")
-    use_extended = st.sidebar.checkbox("Use Extended Universe (includes ETFs)", value=False)
-    
+    use_extended = st.sidebar.checkbox(
+        "Use Extended Universe (includes ETFs)", value=False
+    )
+
     custom_tickers = st.sidebar.text_input("Custom Tickers (comma-separated)", value="")
-    
+
     # Load data
     if custom_tickers:
-        tickers = [t.strip().upper() for t in custom_tickers.split(',')]
+        tickers = [t.strip().upper() for t in custom_tickers.split(",")]
     else:
         tickers = config.data.default_tickers[:10] if not use_extended else None
-    
+
     try:
         with st.spinner("Loading market data..."):
             prices, returns, market_caps = load_data_cached(tickers, use_extended)
-        
+
         assets = returns.columns.tolist()
         st.sidebar.success(f"✅ Loaded {len(assets)} assets")
-        
+
     except Exception as e:
         st.error(f"Failed to load data: {e}")
         st.stop()
-    
+
     # Model parameters
     st.sidebar.subheader("🔧 Model Parameters")
-    
+
     tau = st.sidebar.slider("τ (Tau) - Prior Uncertainty", 0.01, 0.2, 0.05, 0.01)
     delta = st.sidebar.slider("δ (Delta) - Risk Aversion", 1.0, 10.0, 3.0, 0.5)
-    confidence = st.sidebar.selectbox("View Confidence Level", ['low', 'medium', 'high'], index=1)
-    
+    confidence = st.sidebar.selectbox(
+        "View Confidence Level", ["low", "medium", "high"], index=1
+    )
+
     # Views configuration
     st.sidebar.subheader("🎯 Investment Views")
-    
-    view_type = st.sidebar.selectbox("View Type", ["Relative Performance", "Absolute Return"])
-    
+
+    view_type = st.sidebar.selectbox(
+        "View Type", ["Relative Performance", "Absolute Return"]
+    )
+
     # Create views
     if view_type == "Relative Performance":
         asset1 = st.sidebar.selectbox("Asset 1 (Outperform)", assets, index=0)
         asset2 = st.sidebar.selectbox("Asset 2 (Underperform)", assets, index=1)
-        outperformance = st.sidebar.slider("Expected Outperformance (%)", -10.0, 10.0, 3.0, 0.5)
-        
+        outperformance = st.sidebar.slider(
+            "Expected Outperformance (%)", -10.0, 10.0, 3.0, 0.5
+        )
+
         P = np.zeros((1, len(assets)))
         P[0, assets.index(asset1)] = 1
         P[0, assets.index(asset2)] = -1
         Q = np.array([outperformance / 100])
-        
+
         view_description = f"{asset1} will outperform {asset2} by {outperformance:.1f}%"
-        
+
     else:  # Absolute Return
         target_asset = st.sidebar.selectbox("Target Asset", assets)
-        expected_return = st.sidebar.slider("Expected Annual Return (%)", 0.0, 30.0, 12.0, 1.0)
-        
+        expected_return = st.sidebar.slider(
+            "Expected Annual Return (%)", 0.0, 30.0, 12.0, 1.0
+        )
+
         P = np.zeros((1, len(assets)))
         P[0, assets.index(target_asset)] = 1
         Q = np.array([expected_return / 100])
-        
+
         view_description = f"{target_asset} will return {expected_return:.1f}% annually"
-    
+
     # Portfolio constraints
     st.sidebar.subheader("⚖️ Portfolio Constraints")
     max_weight = st.sidebar.slider("Maximum Asset Weight (%)", 10, 100, 40, 5) / 100
     long_only = st.sidebar.checkbox("Long Only (No Shorting)", True)
-    
+
     # Main dashboard
     try:
         # Initialize Black-Litterman model
         with st.spinner("Computing Black-Litterman model..."):
-            bl_model = BlackLittermanModel(returns, market_caps, risk_aversion=delta, tau=tau)
+            bl_model = BlackLittermanModel(
+                returns, market_caps, risk_aversion=delta, tau=tau
+            )
             bl_model.set_views(P, Q, confidence_level=confidence)
             bl_returns, bl_cov = bl_model.compute_posterior()
-        
+
         # Create optimizers
         sample_optimizer = PortfolioOptimizer(returns.mean() * 252, returns.cov() * 252)
         bl_optimizer = PortfolioOptimizer(bl_returns * 252, bl_cov * 252)
-        
+
         # Optimize portfolios
-        constraints = {'long_only': long_only, 'max_weight': max_weight}
-        
+        constraints = {"long_only": long_only, "max_weight": max_weight}
+
         market_weights = bl_model.market_weights
-        
+
         try:
             sample_weights, sample_info = sample_optimizer.optimize_constrained(
                 constraints=constraints, risk_aversion=delta
             )
         except:
-            sample_weights = pd.Series(1/len(assets), index=assets)
-            sample_info = {'portfolio_return': 0.1, 'portfolio_risk': 0.15, 'sharpe_ratio': 0.67}
-        
+            sample_weights = pd.Series(1 / len(assets), index=assets)
+            sample_info = {
+                "portfolio_return": 0.1,
+                "portfolio_risk": 0.15,
+                "sharpe_ratio": 0.67,
+            }
+
         try:
             bl_weights, bl_info = bl_optimizer.optimize_constrained(
                 constraints=constraints, risk_aversion=delta
             )
         except:
-            bl_weights = pd.Series(1/len(assets), index=assets)
-            bl_info = {'portfolio_return': 0.12, 'portfolio_risk': 0.16, 'sharpe_ratio': 0.75}
-        
+            bl_weights = pd.Series(1 / len(assets), index=assets)
+            bl_info = {
+                "portfolio_return": 0.12,
+                "portfolio_risk": 0.16,
+                "sharpe_ratio": 0.75,
+            }
+
         # Performance metrics
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             market_return = (market_weights * returns.mean() * 252).sum()
-            market_risk = np.sqrt(np.dot(market_weights, np.dot(returns.cov() * 252, market_weights)))
+            market_risk = np.sqrt(
+                np.dot(market_weights, np.dot(returns.cov() * 252, market_weights))
+            )
             market_sharpe = market_return / market_risk if market_risk > 0 else 0
-            
-            st.metric("Market Cap Portfolio", f"{market_return:.1%}", f"Sharpe: {market_sharpe:.3f}")
-        
+
+            st.metric(
+                "Market Cap Portfolio",
+                f"{market_return:.1%}",
+                f"Sharpe: {market_sharpe:.3f}",
+            )
+
         with col2:
-            st.metric("Sample Mean-Variance", f"{sample_info['portfolio_return']:.1%}", 
-                     f"Sharpe: {sample_info['sharpe_ratio']:.3f}")
-        
+            st.metric(
+                "Sample Mean-Variance",
+                f"{sample_info['portfolio_return']:.1%}",
+                f"Sharpe: {sample_info['sharpe_ratio']:.3f}",
+            )
+
         with col3:
-            st.metric("Black-Litterman", f"{bl_info['portfolio_return']:.1%}", 
-                     f"Sharpe: {bl_info['sharpe_ratio']:.3f}")
-        
+            st.metric(
+                "Black-Litterman",
+                f"{bl_info['portfolio_return']:.1%}",
+                f"Sharpe: {bl_info['sharpe_ratio']:.3f}",
+            )
+
         # Tabbed interface
-        tab1, tab2, tab3 = st.tabs(["🚀 3D Visualizations", "📊 Portfolio Analysis", "📥 Export & Reports"])
-        
+        tab1, tab2, tab3 = st.tabs(
+            ["🚀 3D Visualizations", "📊 Portfolio Analysis", "📥 Export & Reports"]
+        )
+
         with tab1:
             st.markdown("### 🚀 3D Interactive Visualizations")
             st.markdown("---")  # Visual separator
-            
+
             # Main 3D Visualization Section with perfect spacing
             st.markdown("#### 🌟 3D Efficient Frontier")
             st.markdown("")  # Add spacing
-            
+
             # Create full-width 3D chart with professional spacing
             frontier_fig = create_3d_efficient_frontier(bl_optimizer)
-            
+
             # Enhanced container with proper margins
-            st.markdown("""
+            st.markdown(
+                """
             <div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.1); 
                        border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
-            """, unsafe_allow_html=True)
-            
-            st.plotly_chart(frontier_fig, use_container_width=True, config={
-                'displayModeBar': True,
-                'displaylogo': False,
-                'modeBarButtonsToRemove': ['pan2d', 'lasso2d', 'select2d']
-            })
-            
+            """,
+                unsafe_allow_html=True,
+            )
+
+            st.plotly_chart(
+                frontier_fig,
+                use_container_width=True,
+                config={
+                    "displayModeBar": True,
+                    "displaylogo": False,
+                    "modeBarButtonsToRemove": ["pan2d", "lasso2d", "select2d"],
+                },
+            )
+
             st.markdown("</div>", unsafe_allow_html=True)
-            
+
             # Secondary visualizations row with perfect spacing
             st.markdown("---")
             st.markdown("#### 💼 Portfolio Analysis & Allocation")
             st.markdown("")  # Add spacing
-            
+
             # Two-column layout with proper spacing
             col1, col2 = st.columns([1.2, 0.8], gap="large")
-            
+
             with col1:
                 st.markdown("##### 💎 Portfolio Allocation")
                 allocation_fig = create_allocation_pie(bl_weights, "BL Portfolio")
-                
+
                 # Container with spacing
-                st.markdown("""
+                st.markdown(
+                    """
                 <div style="margin: 15px 0; padding: 10px; background: rgba(0,0,0,0.05); 
                            border-radius: 10px;">
-                """, unsafe_allow_html=True)
-                
+                """,
+                    unsafe_allow_html=True,
+                )
+
                 st.plotly_chart(allocation_fig, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
-            
+
             with col2:
                 st.markdown("##### 📊 Portfolio Metrics")
-                
+
                 # Enhanced metrics box with better spacing
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                            border-radius: 15px; padding: 25px; margin: 15px 0; color: white;
                            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
@@ -627,10 +702,13 @@ def main():
                         <p><strong>Largest Position:</strong><br/>{bl_weights.idxmax()} ({bl_weights.max():.1%})</p>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-                
+                """,
+                    unsafe_allow_html=True,
+                )
+
                 # Additional metrics in a separate box
-                st.markdown(f"""
+                st.markdown(
+                    f"""
                 <div style="background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%); 
                            border-radius: 15px; padding: 20px; margin: 15px 0; color: white;
                            box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);">
@@ -641,66 +719,85 @@ def main():
                         <p><strong>View Impact:</strong> Active</p>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-        
+                """,
+                    unsafe_allow_html=True,
+                )
+
         with tab2:
             st.subheader("📊 Portfolio Analysis")
-            
+
             # Current view
             st.info(f"**Current View:** {view_description}")
-            
+
             # Portfolio comparison table
-            comparison_df = pd.DataFrame({
-                'Market Cap (%)': market_weights * 100,
-                'Sample MV (%)': sample_weights * 100,
-                'Black-Litterman (%)': bl_weights * 100
-            }).round(2)
-            
+            comparison_df = pd.DataFrame(
+                {
+                    "Market Cap (%)": market_weights * 100,
+                    "Sample MV (%)": sample_weights * 100,
+                    "Black-Litterman (%)": bl_weights * 100,
+                }
+            ).round(2)
+
             st.dataframe(comparison_df, height=400)
-            
+
             # Returns comparison
-            returns_comparison = pd.DataFrame({
-                'Market Implied (%)': bl_model.implied_returns * 252 * 100,
-                'BL Posterior (%)': bl_returns * 252 * 100,
-                'Difference (%)': (bl_returns - bl_model.implied_returns) * 252 * 100
-            }).round(2)
-            
+            returns_comparison = pd.DataFrame(
+                {
+                    "Market Implied (%)": bl_model.implied_returns * 252 * 100,
+                    "BL Posterior (%)": bl_returns * 252 * 100,
+                    "Difference (%)": (bl_returns - bl_model.implied_returns)
+                    * 252
+                    * 100,
+                }
+            ).round(2)
+
             st.subheader("📈 Expected Returns Comparison")
             st.dataframe(returns_comparison)
-        
+
         with tab3:
             st.subheader("📥 Export & Reports")
-            
+
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.subheader("Download Portfolio Data")
-                
+
                 # Export weights
-                st.markdown(export_to_csv(comparison_df, "portfolio_weights.csv"), unsafe_allow_html=True)
-                
+                st.markdown(
+                    export_to_csv(comparison_df, "portfolio_weights.csv"),
+                    unsafe_allow_html=True,
+                )
+
                 # Export returns
-                st.markdown(export_to_csv(returns_comparison, "expected_returns.csv"), unsafe_allow_html=True)
-            
+                st.markdown(
+                    export_to_csv(returns_comparison, "expected_returns.csv"),
+                    unsafe_allow_html=True,
+                )
+
             with col2:
                 st.subheader("Model Summary")
-                
+
                 summary = bl_model.get_model_summary()
-                st.json({
-                    'Assets': summary['n_assets'],
-                    'Risk Aversion': summary['risk_aversion'],
-                    'Tau': summary['tau'],
-                    'Views': summary['n_views'] if summary['has_views'] else 0,
-                    'BL Sharpe Ratio': round(bl_info['sharpe_ratio'], 3)
-                })
-        
+                st.json(
+                    {
+                        "Assets": summary["n_assets"],
+                        "Risk Aversion": summary["risk_aversion"],
+                        "Tau": summary["tau"],
+                        "Views": summary["n_views"] if summary["has_views"] else 0,
+                        "BL Sharpe Ratio": round(bl_info["sharpe_ratio"], 3),
+                    }
+                )
+
     except Exception as e:
         st.error(f"Error in computation: {e}")
         st.info("Please adjust parameters and try again.")
 
+
 # Footer
 st.markdown("---")
-st.markdown("Built with ❤️ using Streamlit and Plotly | 🎯 Professional Portfolio Optimization")
+st.markdown(
+    "Built with ❤️ using Streamlit and Plotly | 🎯 Professional Portfolio Optimization"
+)
 
 if __name__ == "__main__":
     main()

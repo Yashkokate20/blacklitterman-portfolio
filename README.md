@@ -209,39 +209,6 @@ pip install cvxopt    # Alternative
 - Reduce number of assets for better performance
 - Clear browser cache if visualizations don't update
 
-## 🤝 Contributing
-
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-### Quick Start for Contributors
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Install development dependencies: `pip install -r requirements-dev.txt`
-4. Make your changes and add tests
-5. Run the test suite: `pytest tests/ -v`
-6. Submit a pull request
-
-### Development Setup
-
-```bash
-# Clone your fork
-git clone https://github.com/YOUR_USERNAME/blacklitterman-portfolio.git
-cd blacklitterman-portfolio
-
-# Set up development environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
-
-# Install pre-commit hooks
-pre-commit install
-
-# Run tests to verify setup
-pytest tests/ -v
-```
-
 ## 📊 Performance & Scalability
 
 ### Benchmarks
@@ -288,21 +255,34 @@ This project provides a foundation for 8+ advanced features:
 7. **Alternative Assets**: Crypto/commodities integration
 8. **Real-Time Updates**: Live market data streaming
 
----
-
-## 📄 License
-
-MIT License - see LICENSE file for details.
-
----
-
 ## 🤝 Contributing
 
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+
+### Quick Start for Contributors
+
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Install development dependencies: `pip install -r requirements.txt`
+4. Make your changes and add tests
+5. Run the test suite: `pytest tests/ -v`
+6. Submit a pull request
+
+### Development Setup
+
+```bash
+# Clone your fork
+git clone https://github.com/YOUR_USERNAME/blacklitterman-portfolio.git
+cd blacklitterman-portfolio
+
+# Set up development environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+
+# Run tests to verify setup
+pytest tests/ -v
+```
 
 ---
 

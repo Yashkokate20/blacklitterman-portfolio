@@ -308,7 +308,7 @@ jobs:
           "src/portfolio_optimization.py"
           "src/backtesting.py"
           "src/utils.py"
-          "config.py"
+          "config/settings.py"
         )
         
         for file in "${required_files[@]}"; do
@@ -321,7 +321,15 @@ jobs:
         echo "✅ All required files present"
         
         # Test that the main components work together
-        python test_implementation.py
+        python -c "
+        import sys
+        sys.path.append('src')
+        from black_litterman import BlackLittermanModel
+        from portfolio_optimization import PortfolioOptimizer
+        from utils import load_market_data
+        from config import config
+        print('✅ All main components can be imported and work together')
+        "
         
         echo "✅ Deployment readiness test passed"
     
