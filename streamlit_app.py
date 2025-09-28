@@ -39,10 +39,40 @@ st.set_page_config(
 # Custom CSS for professional styling
 st.markdown("""
 <style>
-/* Main app styling */
+/* Main app styling with perfect spacing */
 .main .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
+}
+
+/* Perfect spacing for plotly charts */
+.js-plotly-plot {
+    margin: 20px 0 !important;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Column spacing enhancement */
+.css-ocqkz7, .css-1r6slb0 {
+    gap: 2.5rem !important;
+}
+
+/* Tab content spacing */
+.stTabs > div > div > div {
+    padding-top: 25px;
+}
+
+/* Section spacing */
+.element-container {
+    margin-bottom: 18px;
+}
+
+/* Horizontal rule styling */
+hr {
+    border: none;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #4CAF50, transparent);
+    margin: 30px 0;
 }
 
 /* Metric containers */
@@ -214,42 +244,72 @@ def create_3d_efficient_frontier(optimizer, n_points=25):
             )
         )
         
-        # Update layout
+        # Update layout with professional spacing and margins
         fig.update_layout(
             title={
                 'text': "🚀 3D Portfolio Optimization Universe",
                 'x': 0.5,
-                'font': {'size': 20, 'color': 'white'}
+                'y': 0.95,  # Position title with proper spacing
+                'xanchor': 'center',
+                'yanchor': 'top',
+                'font': {'size': 22, 'color': 'white', 'family': 'Arial, sans-serif'}
             },
             scene=dict(
                 xaxis=dict(
-                    title=dict(text="Risk (%)", font=dict(color='white')),
+                    title=dict(text="Risk (%)", font=dict(color='white', size=14)),
                     backgroundcolor="rgba(0,0,0,0.8)",
-                    gridcolor="white",
-                    tickfont=dict(color='white')
+                    gridcolor="rgba(255,255,255,0.3)",
+                    gridwidth=1,
+                    tickfont=dict(color='white', size=11),
+                    showbackground=True,
+                    showgrid=True,
+                    zeroline=False
                 ),
                 yaxis=dict(
-                    title=dict(text="Return (%)", font=dict(color='white')),
+                    title=dict(text="Return (%)", font=dict(color='white', size=14)),
                     backgroundcolor="rgba(0,0,0,0.8)",
-                    gridcolor="white",
-                    tickfont=dict(color='white')
+                    gridcolor="rgba(255,255,255,0.3)",
+                    gridwidth=1,
+                    tickfont=dict(color='white', size=11),
+                    showbackground=True,
+                    showgrid=True,
+                    zeroline=False
                 ),
                 zaxis=dict(
-                    title=dict(text="Sharpe Ratio", font=dict(color='white')),
+                    title=dict(text="Sharpe Ratio", font=dict(color='white', size=14)),
                     backgroundcolor="rgba(0,0,0,0.8)",
-                    gridcolor="white",
-                    tickfont=dict(color='white')
+                    gridcolor="rgba(255,255,255,0.3)",
+                    gridwidth=1,
+                    tickfont=dict(color='white', size=11),
+                    showbackground=True,
+                    showgrid=True,
+                    zeroline=False
                 ),
                 bgcolor="rgba(0,0,0,0.9)",
-                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+                camera=dict(
+                    eye=dict(x=1.8, y=1.8, z=1.5),
+                    up=dict(x=0, y=0, z=1),
+                    center=dict(x=0, y=0, z=0)
+                ),
+                aspectmode='cube',
+                aspectratio=dict(x=1, y=1, z=0.8)
             ),
-            height=600,
+            height=650,  # Increased height for better visibility
+            width=None,  # Auto-width for responsiveness
+            margin=dict(l=50, r=50, t=80, b=50),  # Professional margins
             paper_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white', family='Arial, sans-serif'),
             showlegend=True,
             legend=dict(
+                x=0.02,
+                y=0.98,
+                xanchor='left',
+                yanchor='top',
                 bgcolor="rgba(0,0,0,0.8)",
-                font=dict(color="white")
+                bordercolor="rgba(255,255,255,0.3)",
+                borderwidth=1,
+                font=dict(color="white", size=12)
             )
         )
         
@@ -291,28 +351,73 @@ def create_fallback_chart():
     return fig
 
 def create_allocation_pie(weights, title):
-    """Create enhanced portfolio allocation pie chart"""
+    """Create enhanced portfolio allocation pie chart with perfect spacing"""
     # Only show non-zero weights
     non_zero_weights = weights[weights > 0.001]
+    
+    # Add 'Others' category if there are small weights
+    other_weight = weights[weights <= 0.001].sum()
+    if other_weight > 0:
+        non_zero_weights['Others'] = other_weight
     
     fig = go.Figure(data=[go.Pie(
         labels=non_zero_weights.index,
         values=non_zero_weights.values * 100,
-        hole=0.4,
+        hole=0.45,  # Slightly larger hole for better proportions
         textinfo='label+percent',
+        textposition='outside',
+        textfont=dict(size=11, color='white'),
         marker=dict(
             colors=px.colors.qualitative.Set3,
-            line=dict(color='white', width=2)
+            line=dict(color='white', width=3)  # Thicker borders for clarity
         ),
-        pull=[0.05 if i == non_zero_weights.values.argmax() else 0 for i in range(len(non_zero_weights))]
+        pull=[0.1 if i == non_zero_weights.values.argmax() else 0 for i in range(len(non_zero_weights))],
+        sort=False,  # Maintain order for consistency
+        direction='clockwise',
+        hovertemplate='<b>%{label}</b><br>' +
+                      'Weight: %{value:.1f}%<br>' +
+                      'Percentage: %{percent}<br>' +
+                      '<extra></extra>'
     )])
     
     fig.update_layout(
-        title=f"💼 {title}",
-        height=400,
+        title={
+            'text': f"💼 {title}",
+            'x': 0.5,
+            'y': 0.95,
+            'xanchor': 'center',
+            'yanchor': 'top',
+            'font': {'size': 18, 'color': 'white', 'family': 'Arial, sans-serif'}
+        },
+        height=450,  # Increased height for better spacing
+        width=None,   # Auto-width for responsiveness
+        margin=dict(l=40, r=40, t=60, b=40),  # Professional margins
         paper_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='white'),
-        showlegend=True
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white', size=12, family='Arial, sans-serif'),
+        showlegend=True,
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05,
+            bgcolor="rgba(0,0,0,0.8)",
+            bordercolor="rgba(255,255,255,0.3)",
+            borderwidth=1,
+            font=dict(size=10)
+        ),
+        annotations=[
+            dict(
+                text=f'<b>Active</b><br><span style="font-size:16px">{len(non_zero_weights)}</span><br><span style="font-size:9px">Positions</span>',
+                x=0.5, y=0.5,
+                font_size=12,
+                font_color='white',
+                font_family='Arial, sans-serif',
+                showarrow=False,
+                align='center'
+            )
+        ]
     )
     
     return fig
@@ -461,29 +566,80 @@ def main():
         
         with tab1:
             st.markdown("### 🚀 3D Interactive Visualizations")
+            st.markdown("---")  # Visual separator
             
-            col1, col2 = st.columns([2, 1])
+            # Main 3D Visualization Section with perfect spacing
+            st.markdown("#### 🌟 3D Efficient Frontier")
+            st.markdown("")  # Add spacing
+            
+            # Create full-width 3D chart with professional spacing
+            frontier_fig = create_3d_efficient_frontier(bl_optimizer)
+            
+            # Enhanced container with proper margins
+            st.markdown("""
+            <div style="margin: 20px 0; padding: 15px; background: rgba(0,0,0,0.1); 
+                       border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);">
+            """, unsafe_allow_html=True)
+            
+            st.plotly_chart(frontier_fig, use_container_width=True, config={
+                'displayModeBar': True,
+                'displaylogo': False,
+                'modeBarButtonsToRemove': ['pan2d', 'lasso2d', 'select2d']
+            })
+            
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Secondary visualizations row with perfect spacing
+            st.markdown("---")
+            st.markdown("#### 💼 Portfolio Analysis & Allocation")
+            st.markdown("")  # Add spacing
+            
+            # Two-column layout with proper spacing
+            col1, col2 = st.columns([1.2, 0.8], gap="large")
             
             with col1:
-                # 3D Efficient Frontier
-                st.markdown("#### 🌟 3D Efficient Frontier")
-                frontier_fig = create_3d_efficient_frontier(bl_optimizer)
-                st.plotly_chart(frontier_fig, use_container_width=True)
+                st.markdown("##### 💎 Portfolio Allocation")
+                allocation_fig = create_allocation_pie(bl_weights, "BL Portfolio")
+                
+                # Container with spacing
+                st.markdown("""
+                <div style="margin: 15px 0; padding: 10px; background: rgba(0,0,0,0.05); 
+                           border-radius: 10px;">
+                """, unsafe_allow_html=True)
+                
+                st.plotly_chart(allocation_fig, use_container_width=True)
+                st.markdown("</div>", unsafe_allow_html=True)
             
             with col2:
-                st.markdown("#### 💎 Portfolio Allocation")
-                allocation_fig = create_allocation_pie(bl_weights, "BL Portfolio")
-                st.plotly_chart(allocation_fig, use_container_width=True)
+                st.markdown("##### 📊 Portfolio Metrics")
                 
-                # Portfolio metrics
+                # Enhanced metrics box with better spacing
                 st.markdown(f"""
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                           border-radius: 15px; padding: 20px; margin: 10px 0; color: white;">
-                    <h4>📊 Portfolio Metrics</h4>
-                    <p><strong>Expected Return:</strong> {bl_info['portfolio_return']:.1%}</p>
-                    <p><strong>Volatility:</strong> {bl_info['portfolio_risk']:.1%}</p>
-                    <p><strong>Sharpe Ratio:</strong> {bl_info['sharpe_ratio']:.3f}</p>
-                    <p><strong>Largest Position:</strong> {bl_weights.idxmax()} ({bl_weights.max():.1%})</p>
+                           border-radius: 15px; padding: 25px; margin: 15px 0; color: white;
+                           box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+                           border: 1px solid rgba(255, 255, 255, 0.18);">
+                    <h4 style="margin-bottom: 20px; text-align: center;">📊 Key Metrics</h4>
+                    <div style="line-height: 2.2;">
+                        <p><strong>Expected Return:</strong><br/>{bl_info['portfolio_return']:.1%}</p>
+                        <p><strong>Volatility:</strong><br/>{bl_info['portfolio_risk']:.1%}</p>
+                        <p><strong>Sharpe Ratio:</strong><br/>{bl_info['sharpe_ratio']:.3f}</p>
+                        <p><strong>Largest Position:</strong><br/>{bl_weights.idxmax()} ({bl_weights.max():.1%})</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Additional metrics in a separate box
+                st.markdown(f"""
+                <div style="background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%); 
+                           border-radius: 15px; padding: 20px; margin: 15px 0; color: white;
+                           box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.3);">
+                    <h5 style="margin-bottom: 15px; text-align: center;">📈 Additional Info</h5>
+                    <div style="line-height: 2;">
+                        <p><strong>Assets:</strong> {len(bl_weights[bl_weights > 0.001])}</p>
+                        <p><strong>Concentration:</strong> {(bl_weights ** 2).sum():.3f}</p>
+                        <p><strong>View Impact:</strong> Active</p>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
         
