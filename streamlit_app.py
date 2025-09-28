@@ -223,24 +223,21 @@ def create_3d_efficient_frontier(optimizer, n_points=25):
             },
             scene=dict(
                 xaxis=dict(
-                    title="Risk (%)",
+                    title=dict(text="Risk (%)", font=dict(color='white')),
                     backgroundcolor="rgba(0,0,0,0.8)",
                     gridcolor="white",
-                    titlefont=dict(color='white'),
                     tickfont=dict(color='white')
                 ),
                 yaxis=dict(
-                    title="Return (%)",
+                    title=dict(text="Return (%)", font=dict(color='white')),
                     backgroundcolor="rgba(0,0,0,0.8)",
                     gridcolor="white",
-                    titlefont=dict(color='white'),
                     tickfont=dict(color='white')
                 ),
                 zaxis=dict(
-                    title="Sharpe Ratio",
+                    title=dict(text="Sharpe Ratio", font=dict(color='white')),
                     backgroundcolor="rgba(0,0,0,0.8)",
                     gridcolor="white",
-                    titlefont=dict(color='white'),
                     tickfont=dict(color='white')
                 ),
                 bgcolor="rgba(0,0,0,0.9)",
@@ -281,9 +278,9 @@ def create_fallback_chart():
     fig.update_layout(
         title="📊 3D Portfolio Visualization",
         scene=dict(
-            xaxis_title="Risk (%)",
-            yaxis_title="Return (%)",
-            zaxis_title="Sharpe Ratio",
+            xaxis=dict(title=dict(text="Risk (%)", font=dict(color='white'))),
+            yaxis=dict(title=dict(text="Return (%)", font=dict(color='white'))),
+            zaxis=dict(title=dict(text="Sharpe Ratio", font=dict(color='white'))),
             bgcolor="rgba(0,0,0,0.9)"
         ),
         height=600,
