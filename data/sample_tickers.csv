@@ -1,0 +1,21 @@
+ticker,sector,description
+AAPL,Technology,Apple Inc.
+MSFT,Technology,Microsoft Corporation
+AMZN,Consumer Discretionary,Amazon.com Inc.
+GOOGL,Communication Services,Alphabet Inc. Class A
+META,Communication Services,Meta Platforms Inc.
+TSLA,Consumer Discretionary,Tesla Inc.
+NVDA,Technology,NVIDIA Corporation
+JPM,Financials,JPMorgan Chase & Co.
+JNJ,Healthcare,Johnson & Johnson
+UNH,Healthcare,UnitedHealth Group Inc.
+V,Financials,Visa Inc. Class A
+PG,Consumer Staples,Procter & Gamble Co.
+HD,Consumer Discretionary,Home Depot Inc.
+MA,Financials,Mastercard Inc. Class A
+BAC,Financials,Bank of America Corp.
+XOM,Energy,Exxon Mobil Corporation
+ABBV,Healthcare,AbbVie Inc.
+KO,Consumer Staples,Coca-Cola Co.
+PEP,Consumer Staples,PepsiCo Inc.
+COST,Consumer Staples,Costco Wholesale Corp.

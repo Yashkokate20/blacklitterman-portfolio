@@ -1,0 +1,34 @@
+# Black-Litterman Portfolio Optimization Project
+# Core dependencies with specific versions for reproducibility
+
+# Numerical computing
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+
+# Machine learning and statistics  
+scikit-learn>=1.3.0
+
+# Portfolio optimization
+cvxpy>=1.3.0
+
+# Data acquisition
+yfinance>=0.2.0
+
+# Visualization
+plotly>=5.15.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Dashboard
+streamlit>=1.25.0
+
+# Jupyter notebook support
+jupyter>=1.0.0
+ipykernel>=6.25.0
+
+# Testing
+pytest>=7.4.0
+
+# Optional: Progress bars and utilities
+tqdm>=4.65.0
