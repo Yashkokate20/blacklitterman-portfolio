@@ -155,7 +155,20 @@ class PortfolioOptimizer:
         problem = cp.Problem(objective, constraint_list)
         
         try:
-            problem.solve(solver=cp.ECOS, verbose=False)
+            # Try different solvers in order of preference
+            solvers_to_try = [cp.CLARABEL, cp.OSQP, cp.SCS, cp.CVXOPT]
+            
+            for solver in solvers_to_try:
+                try:
+                    if solver.is_installed():
+                        problem.solve(solver=solver, verbose=False)
+                        if problem.status in ['optimal', 'optimal_inaccurate']:
+                            break
+                except:
+                    continue
+            else:
+                # If no specific solver works, try default
+                problem.solve(verbose=False)
             
             if problem.status not in ['optimal', 'optimal_inaccurate']:
                 raise ValueError(f"Optimization failed with status: {problem.status}")

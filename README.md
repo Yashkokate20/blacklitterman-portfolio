@@ -67,7 +67,14 @@ For constrained optimization, use CVX with constraints like: `sum(w) = 1`, `w â‰
 
 ### Prerequisites
 ```bash
-pip install numpy pandas scipy scikit-learn cvxpy yfinance plotly streamlit matplotlib seaborn
+# Install core packages
+pip install -r requirements.txt
+
+# Install optimization solver (recommended)
+pip install clarabel
+
+# Or run the automated installer
+python install_solvers.py
 ```
 
 ### Run Locally
@@ -150,6 +157,37 @@ BlackLitterman-Portfolio-Project/
 - `dashboard_overview.png`: Full Streamlit app interface
 - `3d_efficient_frontier.png`: Interactive 3D portfolio space
 - `allocation_explorer.png`: Dynamic weight visualization
+
+---
+
+## ðŸ”§ Troubleshooting
+
+### Common Issues
+
+**Issue**: `Failed to load data: 'Adj Close'`  
+**Solution**: yfinance API has changed. The app will automatically fallback to synthetic data for demonstration.
+
+**Issue**: `The solver ECOS is not installed`  
+**Solution**: Install a compatible solver:
+```bash
+pip install clarabel  # Recommended
+# OR
+pip install cvxopt    # Alternative
+```
+
+**Issue**: Streamlit app crashes  
+**Solution**: 
+1. Check Python version (3.10+ required)
+2. Update packages: `pip install -r requirements.txt --upgrade`
+3. Clear Streamlit cache: `streamlit cache clear`
+
+**Issue**: Portfolio optimization fails  
+**Solution**: The app includes automatic fallbacks and will use equal weights if optimization fails.
+
+### Performance Tips
+- Use smaller date ranges for faster loading
+- Reduce number of assets for better performance
+- Clear browser cache if visualizations don't update
 
 ---
 

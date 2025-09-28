@@ -60,43 +60,99 @@ def load_data():
         end_date = datetime.now()
         start_date = end_date - timedelta(days=5*365)  # 5 years
         
-        prices = yf.download(tickers, start=start_date, end=end_date)['Adj Close']
+        st.info("📡 Downloading live market data...")
         
-        # Get market caps
+        # Download with proper error handling
+        data = yf.download(tickers, start=start_date, end=end_date, progress=False)
+        
+        # Handle both single ticker and multi-ticker cases
+        if len(tickers) == 1:
+            prices = data['Adj Close'].to_frame()
+            prices.columns = tickers
+        else:
+            # For multiple tickers, check if we got the expected structure
+            if 'Adj Close' in data.columns.names or isinstance(data.columns, pd.MultiIndex):
+                prices = data['Adj Close']
+            else:
+                # Fallback: assume data is already adjusted close prices
+                prices = data
+        
+        # Ensure we have the right column names
+        if isinstance(prices.columns, pd.MultiIndex):
+            prices.columns = prices.columns.droplevel(0)
+        
+        # Get market caps with better error handling
         market_caps = {}
         for ticker in tickers:
             try:
-                info = yf.Ticker(ticker).info
-                market_cap = info.get('marketCap', 100e9)  # Default 100B
-                market_caps[ticker] = market_cap / 1e9
-            except:
-                market_caps[ticker] = 100  # Default 100B
+                ticker_obj = yf.Ticker(ticker)
+                info = ticker_obj.info
+                market_cap = info.get('marketCap', None)
+                if market_cap and market_cap > 0:
+                    market_caps[ticker] = market_cap / 1e9
+                else:
+                    # Fallback market caps (approximate values in billions)
+                    fallback_caps = {
+                        'AAPL': 3000, 'MSFT': 2800, 'AMZN': 1500, 'GOOGL': 1700, 
+                        'META': 800, 'TSLA': 800, 'NVDA': 1600, 'JPM': 450, 
+                        'JNJ': 420, 'UNH': 500
+                    }
+                    market_caps[ticker] = fallback_caps.get(ticker, 100)
+            except Exception as e:
+                st.warning(f"Could not get market cap for {ticker}: {e}")
+                # Use fallback values
+                fallback_caps = {
+                    'AAPL': 3000, 'MSFT': 2800, 'AMZN': 1500, 'GOOGL': 1700, 
+                    'META': 800, 'TSLA': 800, 'NVDA': 1600, 'JPM': 450, 
+                    'JNJ': 420, 'UNH': 500
+                }
+                market_caps[ticker] = fallback_caps.get(ticker, 100)
         
         market_caps = pd.Series(market_caps)
         
         # Clean data
         prices = prices.dropna()
+        
+        # Align market caps with available price data
+        available_tickers = list(set(prices.columns) & set(market_caps.index))
+        prices = prices[available_tickers]
+        market_caps = market_caps[available_tickers]
+        
+        # Calculate returns
         returns = np.log(prices / prices.shift(1)).dropna()
+        
+        st.success(f"✅ Successfully loaded data for {len(available_tickers)} assets")
         
         return prices, returns, market_caps
         
     except Exception as e:
-        st.error(f"Failed to load data: {e}")
+        st.warning(f"Live data failed ({e}), using synthetic data for demonstration")
+        
         # Return sample data
         np.random.seed(42)
         dates = pd.date_range('2020-01-01', periods=1000, freq='D')
-        tickers = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META']
+        tickers = ['AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NVDA', 'JPM', 'JNJ', 'UNH']
         
-        # Generate synthetic data
+        # Generate synthetic data with realistic correlations
+        n_assets = len(tickers)
+        correlation_matrix = np.random.uniform(0.3, 0.7, (n_assets, n_assets))
+        correlation_matrix = (correlation_matrix + correlation_matrix.T) / 2
+        np.fill_diagonal(correlation_matrix, 1.0)
+        
         returns_data = np.random.multivariate_normal(
-            mean=[0.001] * len(tickers),
-            cov=np.eye(len(tickers)) * 0.0004 + np.full((len(tickers), len(tickers)), 0.0001),
+            mean=[0.0008] * n_assets,  # ~20% annual return
+            cov=correlation_matrix * 0.0004,  # ~20% annual volatility
             size=len(dates)
         )
         
         returns = pd.DataFrame(returns_data, index=dates, columns=tickers)
         prices = (returns + 1).cumprod() * 100
-        market_caps = pd.Series([3000, 2800, 1500, 1700, 800], index=tickers)
+        
+        # Realistic market caps
+        market_caps_data = [3000, 2800, 1500, 1700, 800, 800, 1600, 450, 420, 500]
+        market_caps = pd.Series(market_caps_data, index=tickers)
+        
+        st.info("📊 Using synthetic data for demonstration purposes")
         
         return prices, returns, market_caps
 
@@ -307,12 +363,36 @@ def main():
             }
             
             market_weights = bl_model.market_weights
-            sample_weights, sample_info = sample_optimizer.optimize_constrained(
-                constraints=constraints, risk_aversion=delta
-            )
-            bl_weights, bl_info = bl_optimizer.optimize_constrained(
-                constraints=constraints, risk_aversion=delta
-            )
+            
+            try:
+                sample_weights, sample_info = sample_optimizer.optimize_constrained(
+                    constraints=constraints, risk_aversion=delta
+                )
+            except Exception as opt_error:
+                st.warning(f"Sample MV optimization failed: {opt_error}")
+                # Fallback to equal weights
+                sample_weights = pd.Series(1/len(assets), index=assets)
+                sample_info = {
+                    'portfolio_return': (sample_weights * returns.mean() * 252).sum(),
+                    'portfolio_risk': np.sqrt(np.dot(sample_weights, np.dot(returns.cov() * 252, sample_weights))),
+                    'sharpe_ratio': 0.0
+                }
+                sample_info['sharpe_ratio'] = sample_info['portfolio_return'] / sample_info['portfolio_risk'] if sample_info['portfolio_risk'] > 0 else 0
+            try:
+                bl_weights, bl_info = bl_optimizer.optimize_constrained(
+                    constraints=constraints, risk_aversion=delta
+                )
+            except Exception as opt_error:
+                st.error(f"Black-Litterman optimization failed: {opt_error}")
+                st.info("💡 Try adjusting parameters or check solver installation")
+                # Fallback to equal weights
+                bl_weights = pd.Series(1/len(assets), index=assets)
+                bl_info = {
+                    'portfolio_return': (bl_weights * bl_returns * 252).sum(),
+                    'portfolio_risk': np.sqrt(np.dot(bl_weights, np.dot(bl_cov * 252, bl_weights))),
+                    'sharpe_ratio': 0.0
+                }
+                bl_info['sharpe_ratio'] = bl_info['portfolio_return'] / bl_info['portfolio_risk'] if bl_info['portfolio_risk'] > 0 else 0
         
         # Main dashboard layout
         col1, col2, col3 = st.columns(3)
